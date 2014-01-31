@@ -12,8 +12,8 @@ import kafka.async.futures.ValueFuture;
 
 public class CorruptOperation implements KafkaOperation {
 
-	private KafkaBrokerIdentity brokerIdentity;
-	private ValueFuture<List<Long>> broken;
+	private final KafkaBrokerIdentity brokerIdentity;
+	private final ValueFuture<List<Long>> broken;
 
 	public CorruptOperation(KafkaBrokerIdentity brokerIdentity) {
 		super();
@@ -71,6 +71,10 @@ public class CorruptOperation implements KafkaOperation {
 		buffer.putInt(requestSizePosition,size);
 	}
 
+	@Override
+	public void writeComplete() {
+	}
+	
 	@Override
 	public boolean executeRead(ByteBuffer buffer) {
 		int size = buffer.getInt(0) + KafkaAsyncProcessor.SIZEOF_INT32;

@@ -33,7 +33,7 @@ public class KafkaAsyncClient implements BrokerPool, ConnectionManager {
 	private KafkaAsyncProcessor processor;
 	private boolean manageProcessor;
 	
-	private int connectionCount = 1;
+	private int connectionsPerHost = 1;
 	private int maxResponseSize = 1024*1024 + 1024;  // 1K header + 1MB data
 	private int maxRequestSize = 1024*1024 + 1024;   // 1k header + 1MB data
 	
@@ -58,12 +58,15 @@ public class KafkaAsyncClient implements BrokerPool, ConnectionManager {
 		this.config = config;
 	}
 
-	public int getConnectionCount() {
-		return connectionCount;
+	public int getConnectionsPerHost() {
+		return connectionsPerHost;
 	}
 	
-	public void setConnectionCount(int connectionCount) {
-		this.connectionCount = connectionCount;
+	public void setConnectionsPerHost(int connectionsPerHost) {
+		if (connectionsPerHost < 1) {
+			throw new IllegalArgumentException("Connections per host must be an integer greater than 0");
+		}
+		this.connectionsPerHost = connectionsPerHost;
 	}
 	
 	public int getMaxRequestSize() {
@@ -119,7 +122,7 @@ public class KafkaAsyncClient implements BrokerPool, ConnectionManager {
 			brokers.put(broker, state = new BrokerState()); 
 		}
 		
-		state.targetCount = 1;
+		state.targetCount = connectionsPerHost;
 		state.pendingCount = state.targetCount - state.connectionCount;
 		if (state.pendingCount > 0) {
 			pendingConnectionsRev.incrementAndGet();

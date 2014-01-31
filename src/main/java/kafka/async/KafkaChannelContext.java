@@ -11,6 +11,7 @@ import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import kafka.async.futures.ValueFuture;
 
@@ -22,10 +23,12 @@ public class KafkaChannelContext implements ChannelContext {
 	static Logger logger = LoggerFactory.getLogger(KafkaChannelContext.class);
 
 	private SelectionKey selectionKey;
+	private AtomicInteger interestOps = new AtomicInteger();
 	
 	private ByteBuffer readBuffer;
 	private ByteBuffer writeBuffer;
 	
+	KafkaOperation currentWriteOp;
 	private LinkedList<KafkaOperation> readQueue = new LinkedList<KafkaOperation>();
 	
 	private SocketChannel socket;
@@ -66,6 +69,7 @@ public class KafkaChannelContext implements ChannelContext {
 			socket.configureBlocking(false);
 			socket.connect(address);
 			selectionKey = socket.register(selector, SelectionKey.OP_CONNECT, this);
+			addSelectionKeyInterestOps(SelectionKey.OP_CONNECT);
 		} catch (IOException e) {
 			if (socket != null) {
 				try { socket.close(); } catch(IOException ignoreThis) {}
@@ -91,6 +95,35 @@ public class KafkaChannelContext implements ChannelContext {
 		}
 	}
 
+	/**
+	 * Removes a set of ops from this selection key's interestOps set. Thread safety
+	 * is guaranteed by using AtomicInteger CAS
+	 * @param opsToRemove
+	 */
+	private void removeSelectionKeyInterestOps(int opsToRemove) {
+		int currentValue;
+		int newValue;
+		do {
+			currentValue = interestOps.get();
+			newValue = currentValue & ~opsToRemove;
+		} while (!interestOps.compareAndSet(currentValue, newValue));
+		selectionKey.interestOps(interestOps.get());
+	}
+	
+	/**
+	 * Adds a set of ops to this selection key's interestOps set. Thread safety is
+	 * guaranteed by using AtomicInteger CAS
+	 * @param opsToAdd
+	 */
+	private void addSelectionKeyInterestOps(int opsToAdd) {
+		int currentValue;
+		int newValue;
+		do {
+			currentValue = interestOps.get();
+			newValue = currentValue | opsToAdd;
+		} while (!interestOps.compareAndSet(currentValue, newValue));
+		selectionKey.interestOps(interestOps.get());
+	}
 	
 	/**
 	 * Causes this channel context to wake-up so it can find the next operation.<p>
@@ -99,16 +132,17 @@ public class KafkaChannelContext implements ChannelContext {
 	public void wakeup() {
 		logger.trace("Waking up connection (Adding OP_READ and OP_WRITE to interest ops)");
 		if (selectionKey != null) {
-			selectionKey.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+			addSelectionKeyInterestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 			selectionKey.selector().wakeup();
 		}
 	}
-
+	
 	@Override
 	public void doConnect() {
 		connected.completeWithValue(true);
 		logger.trace("Connection complete. Queuing first operation");
-		selectionKey.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+		removeSelectionKeyInterestOps(SelectionKey.OP_CONNECT);
+		addSelectionKeyInterestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 	}
 	
 	@Override
@@ -149,7 +183,7 @@ public class KafkaChannelContext implements ChannelContext {
 			if (readBuffer.position() > 0) {
 				throw new RuntimeException("Stream is corrupted. There are "+readBuffer.position()+" bytes remaining in the read buffer, but no request has been sent");
 			}
-			selectionKey.interestOps(selectionKey.interestOps() & ~SelectionKey.OP_READ);
+			removeSelectionKeyInterestOps(SelectionKey.OP_READ);
 			logger.trace("Read queue is empty. Socket removing OP_READ from interest ops");
 		}
 	}
@@ -164,26 +198,33 @@ public class KafkaChannelContext implements ChannelContext {
 		}
 		
 		if (!writeBuffer.hasRemaining()) {
-			KafkaOperation nextOp = connectionManager.getNextOperationFor(this);
-			if (nextOp != null) {
-				logger.trace("Next operation is ready");
-			} else {
-				logger.trace("No operations waiting");
+			if (currentWriteOp != null) {
+				logger.trace("Write for operation is complete");
+				currentWriteOp.writeComplete();
+				currentWriteOp = null;
 			}
+			
+			logger.trace("No write pending. Socket removing OP_WRITE from interest ops");
+			removeSelectionKeyInterestOps(SelectionKey.OP_WRITE);
+			
+			KafkaOperation nextOp = connectionManager.getNextOperationFor(this);
 
 			if (nextOp != null) {
+				logger.trace("Next operation is ready. Socket adding OP_WRITE to interest ops");
+				addSelectionKeyInterestOps(SelectionKey.OP_WRITE);
+				currentWriteOp = nextOp;
+				
 				writeBuffer.clear();
 				if (nextOp.canRead()) {
 					readQueue.add(nextOp);
-					selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_READ);
 					logger.trace("Next operation requires a response. Socket adding OP_READ to interest ops");
+					addSelectionKeyInterestOps(SelectionKey.OP_READ);
 				}
 				logger.trace("Filling buffer with next write request");
 				nextOp.executeWrite(writeBuffer);
 				writeBuffer.flip();
 			} else {
-				selectionKey.interestOps(selectionKey.interestOps() & ~SelectionKey.OP_WRITE);
-				logger.trace("No writes pending. Socket removing OP_WRITE from interest ops");
+				logger.trace("No operations waiting");
 			}
 		}
 	}

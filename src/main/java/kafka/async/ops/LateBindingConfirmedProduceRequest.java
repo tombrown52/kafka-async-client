@@ -15,16 +15,17 @@ public class LateBindingConfirmedProduceRequest implements KafkaOperation {
 
 	private final KafkaPartitionIdentity partition;
 	private ProduceRequest produceRequest; // not set until "start" is called the first time
-	private OffsetsRequest offsetsRequest;
-	private PartitionProducer.PartitionState state;
+	private final OffsetsRequest offsetsRequest;
+	private final PartitionProducer.PartitionState state;
 	
-	private List<SettableFuture<Boolean>> confirmations;
+	private final List<SettableFuture<Boolean>> confirmations;
 	
 	public LateBindingConfirmedProduceRequest(KafkaPartitionIdentity partition, PartitionProducer.PartitionState state) {
 		synchronized (this) {
 			this.partition = partition;
 			this.state = state;
 			this.offsetsRequest = new OffsetsRequest(partition.broker, partition.topicName, partition.partition, -1, 1);
+			this.confirmations = new ArrayList<SettableFuture<Boolean>>(1048);
 		}
 	}
 	
@@ -42,11 +43,11 @@ public class LateBindingConfirmedProduceRequest implements KafkaOperation {
 		synchronized (this) {
 			if (produceRequest == null) {
 				List<byte[]> messages = new ArrayList<byte[]>(1048);
-				confirmations = new ArrayList<SettableFuture<Boolean>>(1048);
 				state.getMessages(messages,confirmations);
 				
 				produceRequest = new ProduceRequest(partition.broker, partition.topicName, partition.partition, messages);
 				produceRequest.start();
+				
 				offsetsRequest.start();
 				state.requestStarted();
 				return true;
@@ -61,6 +62,10 @@ public class LateBindingConfirmedProduceRequest implements KafkaOperation {
 		offsetsRequest.executeWrite(buffer);
 	}
 
+	@Override
+	public void writeComplete() {
+	}
+	
 	@Override
 	public boolean executeRead(ByteBuffer buffer) {
 		if (offsetsRequest.executeRead(buffer)) {

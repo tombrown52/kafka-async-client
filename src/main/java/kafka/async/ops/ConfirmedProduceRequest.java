@@ -10,8 +10,8 @@ import kafka.async.KafkaOperation;
 
 public class ConfirmedProduceRequest implements KafkaOperation {
 	
-	private ProduceRequest produceRequest;
-	private OffsetsRequest offsetsRequest;
+	private final ProduceRequest produceRequest;
+	private final OffsetsRequest offsetsRequest;
 	
 	public ConfirmedProduceRequest(KafkaBrokerIdentity broker, byte[] topicName, int partition, List<byte[]> messages) {
 		produceRequest = new ProduceRequest(broker, topicName, partition, messages);
@@ -39,8 +39,14 @@ public class ConfirmedProduceRequest implements KafkaOperation {
 		offsetsRequest.executeWrite(buffer);
 	}
 	
+	@Override
+	public void writeComplete() {
+		produceRequest.writeComplete();
+		offsetsRequest.writeComplete();
+	}
+	
 	public Future<List<Long>> getResult() {
-		return offsetsRequest.future;
+		return offsetsRequest.getResult();
 	}
 	
 	@Override

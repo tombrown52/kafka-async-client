@@ -16,11 +16,11 @@ import org.slf4j.LoggerFactory;
 
 public class OffsetsRequest implements KafkaOperation {
 	private KafkaBrokerIdentity broker;
-	byte[] topicName;
-	int partition;
-	long time;
-	int maxOffsets;
-	final ValueFuture<List<Long>> future;
+	private final byte[] topicName;
+	private final int partition;
+	private final long time;
+	private final int maxOffsets;
+	private final ValueFuture<List<Long>> future;
 	
 	static Logger logger = LoggerFactory.getLogger(OffsetsRequest.class);
 
@@ -29,6 +29,7 @@ public class OffsetsRequest implements KafkaOperation {
 		this.topicName = topicName;
 		this.partition = partition;
 		this.time = time;
+		this.maxOffsets = maxOffsets;
 		
 		future = new ValueFuture<List<Long>>();
 	}
@@ -106,10 +107,14 @@ public class OffsetsRequest implements KafkaOperation {
 		buffer.putLong(time);
 		
 		// Max number of offsets (int32);
-		buffer.putInt(1);
+		buffer.putInt(maxOffsets);
 
 		size = buffer.position() - requestSizePosition - KafkaAsyncProcessor.SIZEOF_INT32;
 		buffer.putInt(requestSizePosition,size);
+	}
+	
+	@Override
+	public void writeComplete() {
 	}
 	
 	public Future<List<Long>> getResult() {

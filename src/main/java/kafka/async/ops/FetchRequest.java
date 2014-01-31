@@ -16,13 +16,13 @@ public class FetchRequest implements KafkaOperation {
 
 	static Logger logger = LoggerFactory.getLogger(FetchRequest.class);
 
-	KafkaBrokerIdentity broker;
-	byte[] topicName;
-	int partition;
-	long offset;
-	int maxSize;
+	final KafkaBrokerIdentity broker;
+	final byte[] topicName;
+	final int partition;
+	final long offset;
+	final int maxSize;
 
-	ValueFuture<MessageSet> result;
+	final ValueFuture<MessageSet> result;
 	
 	public FetchRequest(KafkaBrokerIdentity broker, byte[] topicName, int partition, long offset, int maxSize) {
 		this.broker = broker;
@@ -117,6 +117,10 @@ public class FetchRequest implements KafkaOperation {
 		
 		size = buffer.position() - requestSizePosition - KafkaAsyncProcessor.SIZEOF_INT32;
 		buffer.putInt(requestSizePosition,size);
+	}
+	
+	@Override
+	public void writeComplete() {
 	}
 	
 	@Override

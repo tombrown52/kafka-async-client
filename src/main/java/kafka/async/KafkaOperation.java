@@ -25,6 +25,13 @@ public interface KafkaOperation {
 	public void executeWrite(ByteBuffer buffer);
 
 	/**
+	 * Notifies the operation that all bytes have been written to the network buffer.
+	 * For operations that don't require a response, this serves as notification that
+	 * the operation is complete.
+	 */
+	public void writeComplete();
+	
+	/**
 	 * Any time new data is read from the channel, this operation will be invoked
 	 * on the active read operation. The buffer is not reset or flipped between calls
 	 * to this method.<p>

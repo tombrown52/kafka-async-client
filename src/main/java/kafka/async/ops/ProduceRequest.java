@@ -7,19 +7,27 @@ import java.util.zip.CRC32;
 import kafka.async.KafkaAsyncProcessor;
 import kafka.async.KafkaBrokerIdentity;
 import kafka.async.KafkaOperation;
+import kafka.async.futures.SelectableFuture;
+import kafka.async.futures.ValueFuture;
 
 
 public class ProduceRequest implements KafkaOperation {
-	KafkaBrokerIdentity broker;
-	byte[] topicName;
-	int partition;
-	List<byte[]> messages;
+	final KafkaBrokerIdentity broker;
+	final byte[] topicName;
+	final int partition;
+	final List<byte[]> messages;
+	final ValueFuture<Boolean> result;
 	
 	public ProduceRequest(KafkaBrokerIdentity broker, byte[] topicName, int partition, List<byte[]> messages) {
 		this.broker = broker;
 		this.topicName = topicName;
 		this.partition = partition;
 		this.messages = messages;
+		this.result = new ValueFuture<Boolean>();
+	}
+
+	public SelectableFuture<Boolean> getResult() {
+		return result;
 	}
 	
 	@Override
@@ -97,18 +105,23 @@ public class ProduceRequest implements KafkaOperation {
 	}
 	
 	@Override
+	public void writeComplete() {
+		result.completeWithValue(true);
+	}
+	
+	@Override
 	public void responseFailed(Exception reason) {
 		// No response is expected, so the response can't fail.
 	}
 	
 	@Override
 	public void requestFailed(Exception reason) {
-		// No response is expected, so no way to notify that the request failed.
+		result.completeWithException(reason);
 	}
 
 	@Override
 	public void brokerFailed(Exception reason) {
-		// No response is expected, so no way to notify that the request failed.
+		result.completeWithException(reason);
 	}
 	
 	@Override
