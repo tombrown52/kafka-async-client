@@ -8,6 +8,7 @@ import java.util.concurrent.Future;
 import kafka.async.KafkaAsyncProcessor;
 import kafka.async.KafkaBrokerIdentity;
 import kafka.async.KafkaOperation;
+import kafka.async.KafkaPartitionIdentity;
 import kafka.async.futures.ValueFuture;
 
 import org.slf4j.Logger;
@@ -15,18 +16,14 @@ import org.slf4j.LoggerFactory;
 
 
 public class OffsetsRequest implements KafkaOperation {
-	private KafkaBrokerIdentity broker;
-	private final byte[] topicName;
-	private final int partition;
+	private KafkaPartitionIdentity partition;
 	private final long time;
 	private final int maxOffsets;
 	private final ValueFuture<List<Long>> future;
 	
 	static Logger logger = LoggerFactory.getLogger(OffsetsRequest.class);
 
-	public OffsetsRequest(KafkaBrokerIdentity broker, byte[] topicName, int partition, long time, int maxOffsets) {
-		this.broker = broker;
-		this.topicName = topicName;
+	public OffsetsRequest(KafkaPartitionIdentity partition, long time, int maxOffsets) {
 		this.partition = partition;
 		this.time = time;
 		this.maxOffsets = maxOffsets;
@@ -95,13 +92,13 @@ public class OffsetsRequest implements KafkaOperation {
 		buffer.putShort(requestType);
 		
 		// Topic length (int16)
-		buffer.putShort((short)topicName.length);
+		buffer.putShort((short)partition.topicName.length);
 		
 		// Topic (byte[])
-		buffer.put(topicName);
+		buffer.put(partition.topicName);
 		
 		// Partition (int32)
-		buffer.putInt(partition);
+		buffer.putInt(partition.partition);
 		
 		// Time (int64)
 		buffer.putLong(time);
@@ -138,6 +135,6 @@ public class OffsetsRequest implements KafkaOperation {
 
 	@Override
 	public KafkaBrokerIdentity getTargetBroker() {
-		return broker;
+		return partition.broker;
 	}
 }

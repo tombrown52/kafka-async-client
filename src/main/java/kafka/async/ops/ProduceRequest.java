@@ -1,28 +1,36 @@
 package kafka.async.ops;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.zip.CRC32;
+import java.util.zip.GZIPOutputStream;
 
 import kafka.async.KafkaAsyncProcessor;
 import kafka.async.KafkaBrokerIdentity;
 import kafka.async.KafkaOperation;
+import kafka.async.KafkaPartitionIdentity;
+import kafka.async.client.Message;
+import kafka.async.client.Message.MessageStream;
 import kafka.async.futures.SelectableFuture;
 import kafka.async.futures.ValueFuture;
 
 
 public class ProduceRequest implements KafkaOperation {
-	final KafkaBrokerIdentity broker;
-	final byte[] topicName;
-	final int partition;
+	final KafkaPartitionIdentity partition;
 	final List<byte[]> messages;
+	final int compression;
+	final boolean compress;
 	final ValueFuture<Boolean> result;
+
+	public ProduceRequest(KafkaPartitionIdentity partition, List<byte[]> messages) {
+		this(partition, Message.COMPRESSION_NONE, false, messages);
+	}
 	
-	public ProduceRequest(KafkaBrokerIdentity broker, byte[] topicName, int partition, List<byte[]> messages) {
-		this.broker = broker;
-		this.topicName = topicName;
+	public ProduceRequest(KafkaPartitionIdentity partition, int compression, boolean compress, List<byte[]> messages) {
 		this.partition = partition;
 		this.messages = messages;
+		this.compression = compression;
+		this.compress = compress;
 		this.result = new ValueFuture<Boolean>();
 	}
 
@@ -59,42 +67,46 @@ public class ProduceRequest implements KafkaOperation {
 		buffer.putShort(requestType);
 		
 		// Topic length (int16)
-		buffer.putShort((short)topicName.length);
+		buffer.putShort((short)partition.topicName.length);
 		
 		// Topic (byte[])
-		buffer.put(topicName);
+		buffer.put(partition.topicName);
 		
 		// Partition (int32)
-		buffer.putInt(partition);
+		buffer.putInt(partition.partition);
 		
 		// Message-section size (int32) placeholder
 		int messageSectionSizePosition = buffer.position();
 		buffer.putInt(0);
 		
-		CRC32 checksum = new CRC32();
-		
-		for (byte[] message : messages) {
-			
-			// Individual message size (int32) placeholder
-			int messageSizePosition = buffer.position();
-			buffer.putInt(0);
-			
-			// Magic number (int8) (1 = Compression byte exists)
-			buffer.put((byte)1);
-			
-			// Compression (int8) (0 = No compression)
-			buffer.put((byte)0);
-			
-			// Payload checksum (int32) using CRC32
-			checksum.reset();
-			checksum.update(message);
-			buffer.putInt((int)(checksum.getValue() & 0xFFFFFFFFL));
-
-			// Message (byte[])
-			buffer.put(message);
-			
-			size = buffer.position() - messageSizePosition - KafkaAsyncProcessor.SIZEOF_INT32;
-			buffer.putInt(messageSizePosition,size);
+		Message.ByteBufferBackedMessageOutputStream wrapper = new Message.ByteBufferBackedMessageOutputStream(buffer);
+		try {
+			if (compression == Message.COMPRESSION_NONE || !compress) {
+				for (byte[] message : messages) {
+					wrapper.startMessage(compression);
+					wrapper.write(message);
+					wrapper.finishMessage();
+				}
+			} else if (compression == Message.COMPRESSION_GZIP) {
+				try {
+					wrapper.startMessage(compression);
+					GZIPOutputStream stream = new GZIPOutputStream(wrapper);
+					MessageStream out = new MessageStream(stream);
+					for (byte[] message : messages) {
+						out.writeMessage(Message.COMPRESSION_NONE, message);
+					}
+					out.close();
+					wrapper.finishMessage();
+				} catch (IOException e) {
+					throw new RuntimeException("Error occurred while compressing with gzip", e);
+				}
+			} else if (compression == Message.COMPRESSION_SNAPPY) {
+				throw new UnsupportedOperationException("Snappy compression not implemented");
+			} else {
+				throw new UnsupportedOperationException("Unknown compression specified: "+compression);
+			}
+		} finally {
+			wrapper.close();
 		}
 
 		size = buffer.position() - messageSectionSizePosition - KafkaAsyncProcessor.SIZEOF_INT32;
@@ -126,7 +138,7 @@ public class ProduceRequest implements KafkaOperation {
 	
 	@Override
 	public KafkaBrokerIdentity getTargetBroker() {
-		return broker;
+		return partition.broker;
 	}
 	
 }

@@ -24,7 +24,7 @@ public class LateBindingConfirmedProduceRequest implements KafkaOperation {
 		synchronized (this) {
 			this.partition = partition;
 			this.state = state;
-			this.offsetsRequest = new OffsetsRequest(partition.broker, partition.topicName, partition.partition, -1, 1);
+			this.offsetsRequest = new OffsetsRequest(partition, -1, 1);
 			this.confirmations = new ArrayList<SettableFuture<Boolean>>(1048);
 		}
 	}
@@ -45,7 +45,7 @@ public class LateBindingConfirmedProduceRequest implements KafkaOperation {
 				List<byte[]> messages = new ArrayList<byte[]>(1048);
 				state.getMessages(messages,confirmations);
 				
-				produceRequest = new ProduceRequest(partition.broker, partition.topicName, partition.partition, messages);
+				produceRequest = new ProduceRequest(partition, messages);
 				produceRequest.start();
 				
 				offsetsRequest.start();

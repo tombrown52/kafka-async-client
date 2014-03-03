@@ -6,6 +6,8 @@ import java.util.concurrent.Future;
 
 import kafka.async.KafkaBrokerIdentity;
 import kafka.async.KafkaOperation;
+import kafka.async.KafkaPartitionIdentity;
+import kafka.async.client.Message;
 
 
 public class ConfirmedProduceRequest implements KafkaOperation {
@@ -13,9 +15,13 @@ public class ConfirmedProduceRequest implements KafkaOperation {
 	private final ProduceRequest produceRequest;
 	private final OffsetsRequest offsetsRequest;
 	
-	public ConfirmedProduceRequest(KafkaBrokerIdentity broker, byte[] topicName, int partition, List<byte[]> messages) {
-		produceRequest = new ProduceRequest(broker, topicName, partition, messages);
-		offsetsRequest = new OffsetsRequest(broker, topicName, partition, -1, 1);
+	public ConfirmedProduceRequest(KafkaPartitionIdentity partition, List<byte[]> messages) {
+		this(partition, Message.COMPRESSION_NONE, false, messages);
+	}
+	
+	public ConfirmedProduceRequest(KafkaPartitionIdentity partition, int compression, boolean compress, List<byte[]> messages) {
+		produceRequest = new ProduceRequest(partition, compression, compress, messages);
+		offsetsRequest = new OffsetsRequest(partition, -1, 1);
 	}
 	
 	@Override

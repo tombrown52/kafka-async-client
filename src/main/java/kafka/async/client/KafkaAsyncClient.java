@@ -19,6 +19,7 @@ import kafka.async.KafkaAsyncProcessor;
 import kafka.async.KafkaBrokerIdentity;
 import kafka.async.KafkaChannelContext;
 import kafka.async.KafkaOperation;
+import kafka.async.KafkaPartitionIdentity;
 import kafka.async.futures.Wakeable;
 import kafka.async.ops.FetchRequest;
 import kafka.async.ops.OffsetsRequest;
@@ -264,17 +265,17 @@ public class KafkaAsyncClient implements BrokerPool, ConnectionManager {
 		}
 	}
 	
-	public Future<List<Long>> requestOffsets(KafkaBrokerIdentity broker, byte[] topicName, int partition, long time, int maxOffsets) {
-		OffsetsRequest request = new OffsetsRequest(broker, topicName, partition, time, maxOffsets);
+	public Future<List<Long>> requestOffsets(KafkaPartitionIdentity partition, long time, int maxOffsets) {
+		OffsetsRequest request = new OffsetsRequest(partition, time, maxOffsets);
 		execute(request);
 		return request.getResult();
 	}
 	
-	public Future<MessageSet> fetch(KafkaBrokerIdentity broker, byte[] topicName, int partition, long offset, int maxSize) {
+	public Future<MessageSet> fetch(KafkaPartitionIdentity partition, long offset, int maxSize) {
 		if (maxSize > maxResponseSize) {
 			throw new IllegalArgumentException("Requested max response size of "+maxSize+". Maximum possible size is "+maxResponseSize);
 		}
-		FetchRequest fetch = new FetchRequest(broker, topicName, partition, offset, maxSize);
+		FetchRequest fetch = new FetchRequest(partition, offset, maxSize);
 		execute(fetch);
 		return fetch.getResult();
 	}

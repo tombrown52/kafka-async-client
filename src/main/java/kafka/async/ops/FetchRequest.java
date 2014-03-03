@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import kafka.async.KafkaAsyncProcessor;
 import kafka.async.KafkaBrokerIdentity;
 import kafka.async.KafkaOperation;
+import kafka.async.KafkaPartitionIdentity;
 import kafka.async.client.MessageSet;
 import kafka.async.futures.ValueFuture;
 
@@ -16,17 +17,13 @@ public class FetchRequest implements KafkaOperation {
 
 	static Logger logger = LoggerFactory.getLogger(FetchRequest.class);
 
-	final KafkaBrokerIdentity broker;
-	final byte[] topicName;
-	final int partition;
+	final KafkaPartitionIdentity partition;
 	final long offset;
 	final int maxSize;
 
 	final ValueFuture<MessageSet> result;
 	
-	public FetchRequest(KafkaBrokerIdentity broker, byte[] topicName, int partition, long offset, int maxSize) {
-		this.broker = broker;
-		this.topicName = topicName;
+	public FetchRequest(KafkaPartitionIdentity partition, long offset, int maxSize) {
 		this.partition = partition;
 		this.offset = offset;
 		this.maxSize = maxSize;
@@ -77,13 +74,26 @@ public class FetchRequest implements KafkaOperation {
 		if (logger.isTraceEnabled()) {
 			logger.trace("Response status was code: "+errorCode);
 		}
-		if (errorCode != 0) {
-			throw new RuntimeException("Kafka reported error code "+errorCode);
+		switch (errorCode) {
+			case 0: // NoError
+				MessageSet messages = MessageSet.createMessageSet(offset, 0, contents);
+				result.completeWithValue(messages);
+				break;
+			case 1: // OffsetsOutOfRange
+				result.completeWithException(new RuntimeException("Offset out of range: "+partition+", offset="+offset));
+				break;
+			case 2: // InvalidMessage
+				throw new RuntimeException("Kafka reported error code "+errorCode+" (InvalidMessage)");
+			case 3: // WrongPartition
+				result.completeWithException(new RuntimeException("Partition does not exist: "+partition));
+				break;
+			case 4: // InvalidFetchSize
+				result.completeWithException(new RuntimeException("Invalid fetch size: "+partition+", fetchSize="+maxSize));
+				break;
+			default:
+				throw new RuntimeException("Kafka reported error code "+errorCode+" (unknown error code)");
 		}
 
-		MessageSet messages = new MessageSet(this.offset,contents);
-		
-		result.completeWithValue(messages);
 		return true;
 	}
 	
@@ -101,13 +111,13 @@ public class FetchRequest implements KafkaOperation {
 		buffer.putShort(requestType);
 		
 		// Topic length (int16)
-		buffer.putShort((short)topicName.length);
+		buffer.putShort((short)partition.topicName.length);
 		
 		// Topic (byte[])
-		buffer.put(topicName);
+		buffer.put(partition.topicName);
 		
 		// Partition (int32)
-		buffer.putInt(partition);
+		buffer.putInt(partition.partition);
 		
 		// Requested offset (int64)
 		buffer.putLong(offset);
@@ -140,7 +150,7 @@ public class FetchRequest implements KafkaOperation {
 
 	@Override
 	public KafkaBrokerIdentity getTargetBroker() {
-		return broker;
+		return partition.broker;
 	}
 	
 }
