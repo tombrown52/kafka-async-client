@@ -39,6 +39,11 @@ public class ProduceRequest implements KafkaOperation {
 	}
 	
 	@Override
+	public String operationId() {
+		return "K_PRODUCE";
+	}
+	
+	@Override
 	public boolean start() {
 		return true;
 	}

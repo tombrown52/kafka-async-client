@@ -28,7 +28,7 @@ public class StaticConfiguration implements ClientConfiguration {
 	public StaticConfiguration(Set<KafkaPartitionIdentity> partitions) {
 		partitionManager = new ManualPartitionManager();
 		
-		Set<KafkaBrokerIdentity> brokers = new HashSet<KafkaBrokerIdentity>();
+		this.brokers = new HashSet<KafkaBrokerIdentity>();
 		for (KafkaPartitionIdentity partition : partitions) {
 			if (!brokers.contains(partition.broker)) {
 				brokers.add(partition.broker);

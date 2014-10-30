@@ -152,12 +152,17 @@ public class KafkaChannelContext implements ChannelContext {
 			throw new IOException("Channel is closed");
 		}
 		if (logger.isTraceEnabled()) {
-			logger.trace("Read "+bytes+" new bytes for "+readBuffer.position()+" total response bytes");
+			String opType = readQueue.isEmpty() ? "NOOP" : readQueue.getFirst().operationId();
+			logger.trace("Read "+bytes+" new bytes for "+readBuffer.position()+" total response bytes for "+opType);
 		}
 		while (bytes > 0) {
 			bytes = channel.read(readBuffer);
+			if (bytes == -1) {
+				throw new IOException("Channel is closed");
+			}
 			if (logger.isTraceEnabled()) {
-				logger.trace("Read "+bytes+" new bytes for "+readBuffer.position()+" total response bytes");
+				String opType = readQueue.isEmpty() ? "NOOP" : readQueue.getFirst().operationId();
+				logger.trace("Read "+bytes+" new bytes for "+readBuffer.position()+" total response bytes for "+opType);
 			}
 		}
 

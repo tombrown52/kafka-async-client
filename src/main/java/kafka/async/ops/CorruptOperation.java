@@ -31,6 +31,11 @@ public class CorruptOperation implements KafkaOperation {
 	}
 
 	@Override
+	public String operationId() {
+		return "K_CORRUPT";
+	}
+	
+	@Override
 	public boolean start() {
 		return true;
 	}

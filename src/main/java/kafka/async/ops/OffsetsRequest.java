@@ -32,6 +32,11 @@ public class OffsetsRequest implements KafkaOperation {
 	}
 	
 	@Override
+	public String operationId() {
+		return "K_OFFSETS";
+	}
+	
+	@Override
 	public boolean start() {
 		return future.beginExecution();
 	}

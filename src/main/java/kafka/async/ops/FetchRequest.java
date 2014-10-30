@@ -36,6 +36,11 @@ public class FetchRequest implements KafkaOperation {
 	}
 	
 	@Override
+	public String operationId() {
+		return "K_FETCH";
+	}
+	
+	@Override
 	public boolean start() {
 		return result.beginExecution();
 	}

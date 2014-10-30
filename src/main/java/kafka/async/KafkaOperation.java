@@ -3,6 +3,14 @@ package kafka.async;
 import java.nio.ByteBuffer;
 
 public interface KafkaOperation {
+	
+	/**
+	 * Returns an identifier for this operation so that the reader can know
+	 * what type of operation is on the top of the stack.
+	 * @return
+	 */
+	public String operationId();
+	
 	/**
 	 * Returns the target broker against which this request should be executed.
 	 * @return

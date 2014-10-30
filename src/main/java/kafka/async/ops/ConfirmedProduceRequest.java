@@ -25,6 +25,11 @@ public class ConfirmedProduceRequest implements KafkaOperation {
 	}
 	
 	@Override
+	public String operationId() {
+		return "K_PRODUCE_WITH_ACK";
+	}
+	
+	@Override
 	public boolean start() {
 		return offsetsRequest.start();
 	}

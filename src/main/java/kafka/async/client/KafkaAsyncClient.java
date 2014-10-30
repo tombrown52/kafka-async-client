@@ -45,7 +45,8 @@ public class KafkaAsyncClient implements BrokerPool, ConnectionManager {
 	private int currentConnectionsRev = 0;
 	private ClientConfiguration config;
 	
-	private class BrokerState {
+	private static class BrokerState {
+		private BrokerState() {}
 		private LinkedList<KafkaOperation> operationQueue = new LinkedList<KafkaOperation>();
 		private LinkedList<ChannelContext> openConnections = new LinkedList<ChannelContext>();
 		private LinkedList<ChannelContext> idleConnections = new LinkedList<ChannelContext>();
@@ -118,6 +119,7 @@ public class KafkaAsyncClient implements BrokerPool, ConnectionManager {
 
 	@Override
 	public synchronized void addBroker(KafkaBrokerIdentity broker) {
+		logger.info("Adding kafka broker "+broker+" to the client");
 		BrokerState state = brokers.get(broker);
 		if (state == null) {
 			brokers.put(broker, state = new BrokerState()); 
@@ -133,6 +135,7 @@ public class KafkaAsyncClient implements BrokerPool, ConnectionManager {
 	
 	@Override
 	public synchronized void removeBroker(KafkaBrokerIdentity broker) {
+		logger.info("Removing kafka broker "+broker+" to the client");
 		BrokerState state = brokers.get(broker);
 		state.targetCount = 0;
 		state.connectionCount -= state.pendingCount;
@@ -247,6 +250,9 @@ public class KafkaAsyncClient implements BrokerPool, ConnectionManager {
 		
 		BrokerState state = brokers.get(broker);
 
+		if (state == null) {
+			throw new NullPointerException("State for broker "+broker+" was not found");
+		}
 		if (logger.isTraceEnabled()) {
 			logger.trace("Adding operation to queue (size is 1 + "+state.operationQueue.size()+"). Connections: target="+state.targetCount+", open="+state.connectionCount+", pending="+state.pendingCount+", idle="+state.idleConnections.size());
 		}

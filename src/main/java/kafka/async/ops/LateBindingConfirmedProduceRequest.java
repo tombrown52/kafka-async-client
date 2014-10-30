@@ -32,6 +32,11 @@ public class LateBindingConfirmedProduceRequest implements KafkaOperation {
 	public Future<List<Long>> getConfirmation() {
 		return offsetsRequest.getResult();
 	}
+
+	@Override
+	public String operationId() {
+		return "K_PRODUCE_LATE_BIND";
+	}
 	
 	@Override
 	public KafkaBrokerIdentity getTargetBroker() {
