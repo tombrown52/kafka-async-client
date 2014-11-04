@@ -9,11 +9,8 @@ import java.util.concurrent.TimeUnit;
 
 public class WaitingFutureSelector<T> implements FutureSelector<T> {
 
-	enum State {
-		WAITING, READY;
-	}
+	private int readyCount = 0;
 	private Object lock = new Object();
-	private State state = State.WAITING;
 	
 	private Set<SelectableFuture<T>> futures = new HashSet<SelectableFuture<T>>();
 	private Set<Future<T>> ready = new HashSet<Future<T>>();
@@ -21,16 +18,13 @@ public class WaitingFutureSelector<T> implements FutureSelector<T> {
 	@Override
 	public void futureReady(Future<T> future) {
 		synchronized (lock) {
-			state = State.READY;
+			readyCount += 1;
 			lock.notifyAll();
 		}
 	}
 	
 	@Override
 	public Set<Future<T>> readySet() {
-		synchronized (lock) {
-			state = State.WAITING;
-		}
 		return ready;
 	}
 	
@@ -65,6 +59,7 @@ public class WaitingFutureSelector<T> implements FutureSelector<T> {
 	
 	@Override
 	public int selectNow() {
+		int removed = 0;
 		Iterator<SelectableFuture<T>> iterator = futures.iterator();
 		while (iterator.hasNext()) {
 			SelectableFuture<T> f = iterator.next();
@@ -72,7 +67,11 @@ public class WaitingFutureSelector<T> implements FutureSelector<T> {
 				f.removeSelector(this);
 				iterator.remove();
 				ready.add(f);
+				removed++;
 			}
+		}
+		synchronized (lock) {
+			readyCount -= removed;
 		}
 		return ready.size();
 	}
@@ -86,7 +85,7 @@ public class WaitingFutureSelector<T> implements FutureSelector<T> {
 	public int select(long timeout, TimeUnit unit) throws InterruptedException {
 		synchronized (lock) {
 			long endTime = unit.toMillis(timeout) + System.currentTimeMillis();
-			while (state == State.WAITING) {
+			while (readyCount == 0) {
 				long now = System.currentTimeMillis();
 				if (now >= endTime) {
 					return 0;
