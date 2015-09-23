@@ -1,12 +1,20 @@
 package kafka.async;
 
-import java.nio.charset.Charset;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import static org.junit.Assert.*;
+import java.nio.charset.Charset;
+import java.text.ParseException;
+
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 public class TestKafkaPartitionIdentity {
 
+	@Rule
+    public ExpectedException thrown = ExpectedException.none();
 
 	public static Charset ASCII = Charset.forName("ASCII");
 	
@@ -117,4 +125,31 @@ public class TestKafkaPartitionIdentity {
 		assertTrue(bb2.compareTo(bb2) == 0);
 		
 	}
+	
+	
+	@Test
+	public void testParse() throws Exception {
+		KafkaPartitionIdentity ident;
+		
+		int DEFAULT_PORT = 9092;
+		
+		ident = KafkaPartitionIdentity.parseIdentity("kafka://b:9/t#2");
+		assertEquals("b", ident.broker.host);
+		assertEquals(9, ident.broker.port);
+		assertEquals("t", new String(ident.topicName));
+		assertEquals(2, ident.partition);
+	}
+	
+	@Test
+	public void testParseFail() throws Exception {
+		thrown.expect(ParseException.class);
+		KafkaPartitionIdentity.parseIdentity("b:9");
+	}
+	
+	@Test
+	public void testParseFail2() throws Exception {
+		thrown.expect(ParseException.class);
+		KafkaPartitionIdentity.parseIdentity("kafka://b:b");
+	}
+
 }

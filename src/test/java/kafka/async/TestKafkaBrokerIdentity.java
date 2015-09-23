@@ -1,9 +1,19 @@
 package kafka.async;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import java.text.ParseException;
+
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 public class TestKafkaBrokerIdentity {
+
+	@Rule
+    public ExpectedException thrown = ExpectedException.none();
 
 	@Test
 	public void testEquality() {
@@ -52,6 +62,33 @@ public class TestKafkaBrokerIdentity {
 		assertTrue(b2.compareTo(b1) >  0);
 		assertTrue(b2.compareTo(b2) == 0);
 		
+	}
+	
+	@Test
+	public void testParse() throws Exception {
+		KafkaBrokerIdentity ident;
+		
+		int DEFAULT_PORT = 9092;
+		
+		ident = KafkaBrokerIdentity.parseIdentity("kafka://b:9/");
+		assertEquals("b", ident.host);
+		assertEquals(9, ident.port);
+		
+		ident = KafkaBrokerIdentity.parseIdentity("kafka://b/");
+		assertEquals("b", ident.host);
+		assertEquals(DEFAULT_PORT, ident.port);
+	}
+	
+	@Test
+	public void testParseFail() throws Exception {
+		thrown.expect(ParseException.class);
+		KafkaBrokerIdentity.parseIdentity("b:9");
+	}
+	
+	@Test
+	public void testParseFail2() throws Exception {
+		thrown.expect(ParseException.class);
+		KafkaBrokerIdentity.parseIdentity("kafka://b:b");
 	}
 
 }

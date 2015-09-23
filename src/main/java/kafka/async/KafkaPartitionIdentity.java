@@ -1,6 +1,9 @@
 package kafka.async;
 
+import java.text.ParseException;
 import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class KafkaPartitionIdentity implements Comparable<KafkaPartitionIdentity> {
 
@@ -82,5 +85,17 @@ public class KafkaPartitionIdentity implements Comparable<KafkaPartitionIdentity
 		return "[kafka://"+broker.host+":"+broker.port+"/"+new String(topicName)+"#"+partition+"]";
 	}
 	
+	private static Pattern PARSER = Pattern.compile("kafka://([a-z0-9\\.\\-\\_]+)(:([0-9]+))?/([^#]+)#([0-9]+)", Pattern.CASE_INSENSITIVE);
+	public static KafkaPartitionIdentity parseIdentity(String str) throws ParseException {
+		Matcher m = PARSER.matcher(str);
+		if (!m.matches()) {
+			throw new ParseException("Invalid kafka partition identity string", 0);
+		}
+		String host = m.group(1);
+		int port = m.group(3) != null ? Integer.parseInt(m.group(3)) : 9092;
+		String topicName = m.group(4);
+		int partition = Integer.parseInt(m.group(5));
+		return new KafkaPartitionIdentity(new KafkaBrokerIdentity(host, port), topicName.getBytes(), partition);
+	}
 	
 }
