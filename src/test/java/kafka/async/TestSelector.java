@@ -76,4 +76,23 @@ public class TestSelector {
 		Assert.assertEquals(1,selector.readySet().size());
 		System.out.println("Both finished");
 	}
+	
+	
+	@Test
+	public void testForeverWait1() throws Exception {
+		// If the future completes before it can be registered, there
+		// is a chance that the waiting selector will never be notified
+		// and never find the ready item.
+		
+		WaitingFutureSelector<Integer> selector = new WaitingFutureSelector<Integer>();
+		
+		ValueFuture<Integer> future = new ValueFuture<Integer>();
+		future.completeWithValue(5);
+		
+		selector.register(future);
+		
+		int howMany = selector.select(1, TimeUnit.SECONDS);
+		
+		Assert.assertEquals(1, howMany);
+	}
 }

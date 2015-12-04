@@ -26,6 +26,13 @@ public class ValueFuture<T> implements Future<T>, SelectableFuture<T>, SettableF
 			case WAITING:
 				state = State.CANCELLED;
 				lock.notifyAll();
+				
+				if (selectors != null) {
+					for (FutureSelector<T> s : selectors) {
+						s.futureReady(this);
+					}
+				}
+				
 			case CANCELLED:
 				return true;
 			default:
@@ -41,6 +48,10 @@ public class ValueFuture<T> implements Future<T>, SelectableFuture<T>, SettableF
 				selectors = new HashSet<FutureSelector<T>>();
 			}
 			selectors.add(selector);
+			
+			if (state == State.CANCELLED || state == State.COMPLETED) {
+				selector.futureReady(this);
+			}
 		}
 	}
 	
