@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.nio.channels.UnresolvedAddressException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
@@ -13,10 +14,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import kafka.async.futures.ValueFuture;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import kafka.async.futures.ValueFuture;
 
 public class KafkaChannelContext implements ChannelContext {
 	
@@ -70,6 +71,9 @@ public class KafkaChannelContext implements ChannelContext {
 			socket.connect(address);
 			selectionKey = socket.register(selector, SelectionKey.OP_CONNECT, this);
 			addSelectionKeyInterestOps(SelectionKey.OP_CONNECT);
+		} catch (UnresolvedAddressException e) {
+			socket = null;
+			throw new IOException(e);
 		} catch (IOException e) {
 			if (socket != null) {
 				try { socket.close(); } catch(IOException ignoreThis) {}

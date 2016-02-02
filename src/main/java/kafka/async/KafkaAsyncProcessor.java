@@ -9,6 +9,7 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -141,7 +142,7 @@ public class KafkaAsyncProcessor implements Wakeable {
 			}
 			
 			public int select() throws IOException {
-				return selector.select();
+				return selector.select(100);
 			}
 			
 			@Override
@@ -149,16 +150,28 @@ public class KafkaAsyncProcessor implements Wakeable {
 				
 				IOException shutdownReason = null;
 
+				long lastPendingCheck = System.nanoTime();
+				final long RECONNECT_TIME_NANOS = TimeUnit.NANOSECONDS.convert(250, TimeUnit.MILLISECONDS);
+				
 				try {
 					while (open.get()) {
-						processPendingConnections();
+						boolean isTraceEnabled = logger.isTraceEnabled();
+						
+						
+						long elapsed = System.nanoTime() - lastPendingCheck;
+						// Only check for new connections every 250ms
+						// (This prevents a bad connection from spamming reconnect attempts)
+						if (elapsed > RECONNECT_TIME_NANOS) {
+							processPendingConnections();
+							lastPendingCheck = System.nanoTime();
+						}
 						
 						logger.trace("Beginning select");
 						int changed = 0;
 						changed = select();
 	
 						Set<SelectionKey> selectedKeys = selector.selectedKeys();
-						if (logger.isTraceEnabled()) {
+						if (isTraceEnabled) {
 							logger.trace("Select complete. Found "+changed+" changed, and "+selectedKeys.size()+" keys needing attention");
 						}
 						
@@ -220,5 +233,4 @@ public class KafkaAsyncProcessor implements Wakeable {
 		}
 		return buffer.toString();
 	}
-	
 }
